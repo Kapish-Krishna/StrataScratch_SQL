@@ -1,0 +1,121 @@
+1. Find the owner_name and the pe_description of facilities owned by 'BAKERY' where low-risk cases have been reported.
+
+select distinct owner_name, pe_description from los_angeles_restaurant_health_inspections
+where pe_description like '%LOW%RISK%' and owner_name like '%BAKERY%';
+
+2. Check if record_id is unique for every row.
+Output the total record ids and total unique record ids for comparison.
+
+select count(record_id), count(distinct record_id) from los_angeles_restaurant_health_inspections;
+
+3. Find all owners which have only a single facility. Output the owner_name and order the results alphabetically.
+
+select owner_name from los_angeles_restaurant_health_inspections
+group by owner_id, owner_name
+having count(distinct facility_id) = 1
+order by owner_name asc;
+
+4. Find the average score for grades A, B, and C.
+Output the results along with the corresponding grade (ex: 'A', avg(score)).
+
+select grade, avg(score) from los_angeles_restaurant_health_inspections
+group by grade;
+
+5. Find all facilities with the zip code 90049, 90034, or 90045.
+
+select distinct facility_name from los_angeles_restaurant_health_inspections
+where facility_zip in (90049, 90034, 90045);
+
+6. Find all routine inspections where high-risks issues were found.
+
+select * from los_angeles_restaurant_health_inspections
+where service_description = 'ROUTINE INSPECTION'
+and pe_description like '%HIGH%RISK%';
+
+7. Find all inspection details made for facilities owned by 'GLASSELL COFFEE SHOP LLC'.
+
+select * from los_angeles_restaurant_health_inspections
+where owner_name = 'GLASSELL COFFEE SHOP LLC';
+
+8. Find the activity date and the pe_description of facilities with the name 'STREET CHURROS' and with a score of less than 95 points.
+
+select activity_date, pe_description from los_angeles_restaurant_health_inspections
+where facility_name = 'STREET CHURROS'
+and score < 95;
+
+9. Find the most common grade earned by bakeries.
+
+select grade from los_angeles_restaurant_health_inspections
+where facility_name like '%BAKERY%'
+group by grade
+limit 1;
+
+10. Count the number of unique facilities per municipality zip code along with the number of inspections. Output the result along with the number of inspections per each municipality zip code. Sort the result based on the number of inspections in descending order.
+
+select facility_zip, count(distinct facility_id) as no_facilities, count(service_code) as no_inspections from los_angeles_restaurant_health_inspections
+group by facility_zip
+order by no_inspections desc;
+
+11. Find the rules used to determine each grade. Show the rule in a separate column in the format of 'Score > X AND Score <= Y => Grade = A' where X and Y are the lower and upper bounds for a grade. Output the corresponding grade and its highest and lowest scores along with the rule. Order the result based on the grade in ascending order.
+
+select grade, min(score) as lb, max(score) as ub, 
+concat('Score > ', MIN(score)-1, ' AND Score <= ', MAX(score), ' => Grade = ', grade) as rule 
+from los_angeles_restaurant_health_inspections
+group by grade;
+
+12. Find the number of inspections per day.
+Output the result along with the date of the activity.
+Order results based on the activity date in the ascending order.
+
+select activity_date, count(service_code) 
+from los_angeles_restaurant_health_inspections
+group by activity_date
+order by activity_date;
+
+13. Find the mean of inspections scores between 91 and 100.
+Assuming that the scores are normally distributed.
+
+select avg(score) from los_angeles_restaurant_health_inspections
+where score between 91 and 100;
+
+14. Find all inspections which are part of an inactive program.
+
+select * from los_angeles_restaurant_health_inspections
+where program_status = 'INACTIVE';
+
+15. Find the total number of inspections with low risk in 2017.
+
+select count(service_code) from los_angeles_restaurant_health_inspections
+where pe_description like '%LOW%RISK%'
+and year(activity_date) = 2017;
+
+16. Find the month which had the lowest number of inspections across all years.
+Output the number of inspections along with the month.
+
+select date_format(activity_date, '%m') as month, count(service_code) as no_inspections
+from los_angeles_restaurant_health_inspections
+group by MONTH(activity_date)
+order by no_inspections
+limit 1;
+
+17. Find the owners who have at least one facility with all 3 grades.
+
+select owner_name 
+from la_restaurant_health_inspections
+group by facility_id
+having count(distinct grade) = 3;
+
+18. Find the first and last times the maximum score was awarded
+
+select min(activity_date) as first_time, max(activity_date) as last_time from los_angeles_restaurant_health_inspections
+where score = (select max(score) from los_angeles_restaurant_health_inspections);
+
+19. Find the lowest score per each facility in Hollywood Boulevard.
+Output the result along with the corresponding facility name.
+Order the result based on the lowest score in descending order and the facility name in the ascending order.
+
+select facility_name, min(score) as lowest_score
+from los_angeles_restaurant_health_inspections
+where facility_address like '%HOLLYWOOD%BLVD%'
+group by facility_name
+order by lowest_score desc, facility_name asc;
