@@ -129,3 +129,76 @@ select first_name, last_name
 from employee_list
 where profession = 'Doctor' and
 last_name = 'Johnson';
+
+### Medium
+
+22. A group of travelers embark on world tours starting with their home cities. Each traveler has an undecided itinerary that evolves over the course of the tour. Some travelers decide to abruptly end their journey mid-travel and live in their last destination.
+Given the dataset of dates on which they travelled between different pairs of cities, can you find out how many travellers ended back in their home city? For simplicity, you can assume that each traveler made at most one trip between two cities in a day.
+
+select count(*) as no_of_travelers 
+from (select th1.traveler, th1.start_city
+      from travel_history th1
+      join (select traveler, min(date) as start_date, max(date) as end_date
+            from travel_history
+            group by traveler) th2
+      on th1.traveler = th2.traveler and th1.date = th2.start_date) th
+join (select th1.traveler, th1.end_city
+      from travel_history th1
+      join (select traveler, min(date) as start_date, max(date) as end_date
+            from travel_history
+            group by traveler) th3
+      on th1.traveler = th3.traveler and th1.date = th3.end_date) th4
+on th.traveler = th4.traveler
+where start_city = end_city;
+
+23. The election is conducted in a city and everyone can vote for one or more candidates, or choose not to vote at all. Each person has 1 vote so if they vote for multiple candidates, their vote gets equally split across these candidates. For example, if a person votes for 2 candidates, these candidates receive an equivalent of 0.5 vote each.
+Find out who got the most votes and won the election. Output the name of the candidate or multiple names in case of a tie. To avoid issues with a floating-point error you can round the number of votes received by a candidate to 3 decimal places.
+
+select v.candidate 
+from (select vr.candidate, sum(vs.vote_share) as total_votes
+      from voting_results vr
+      join (select voter, round(1/count(*),3) as vote_share
+            from voting_results
+            group by voter) vs
+      on vr.voter = vs.voter
+      group by vr.candidate) v
+where v.total_votes = (
+select max(v.total_votes) as max_votes
+from (select vr.candidate, sum(vs.vote_share) as total_votes
+      from voting_results vr
+      join (select voter, round(1/count(*),3) as vote_share
+            from voting_results
+            group by voter) vs
+      on vr.voter = vs.voter
+      group by vr.candidate) v
+      where v.candidate is not null)
+;
+
+24. For each video, find how many unique users flagged it. A unique user can be identified using the combination of their first name and last name. Do not consider rows in which there is no flag ID.
+
+select u.video_id, count(distinct u.fullname) as no_of_users
+from (select video_id, flag_id, concat(ifnull(user_firstname, ''),' ',ifnull(user_lastname,'')) as fullname
+      from user_flags
+      where flag_id is not null) u
+group by u.video_id;
+
+25. Which user flagged the most distinct videos that ended up approved by YouTube? Output, in one column, their full name or names in case of a tie. In the user's full name, include a space between the first and the last name.
+
+select ufs.fullname 
+from (select uf.fullname, count(distinct uf.video_id) as n_videos
+      from (select concat(ifnull(user_firstname,''),' ',ifnull(user_lastname,'')) as fullname, u.video_id, u.flag_id, reviewed_outcome 
+            from user_flags u
+            join flag_review f
+            on u.flag_id = f.flag_id) uf
+      where uf.reviewed_outcome = 'APPROVED'
+      group by uf.fullname) ufs
+where ufs.n_videos = (select max(ufs.n_videos)
+                      from (select uf.fullname, count(distinct uf.video_id) as n_videos
+      from (select concat(ifnull(user_firstname,''),' ',ifnull(user_lastname,'')) as fullname, u.video_id, u.flag_id, reviewed_outcome 
+            from user_flags u
+            join flag_review f
+            on u.flag_id = f.flag_id) uf
+      where uf.reviewed_outcome = 'APPROVED'
+      group by uf.fullname) ufs);
+
+
