@@ -1,0 +1,131 @@
+1. Find companies that have at least 2 Chinese speaking users.
+
+select company_id from playbook_users
+where language = 'chinese'
+group by company_id
+having count(*) > 1;
+
+2. For each platform (e.g. Windows, iPhone, iPad etc.), calculate the number of users. Consider unique users and not individual sessions. Output the name of the platform with the corresponding number of users.
+
+select platform, count(distinct user_id) as no_of_users
+from user_sessions
+group by platform;
+
+3. For each video game player, find the latest date when they logged in.
+
+select player_id, max(login_date) as last_login 
+from players_logins
+group by player_id;
+
+4. Given the education levels and salaries of a group of individuals, find what is the average salary for each level of education.
+
+select education, avg(salary) as average_salary 
+from google_salaries
+group by education;
+
+5. You have been asked to sort movies according to their duration in descending order.
+Your output should contain all columns sorted by the movie duration in the given dataset.
+
+select * from movie_catalogue
+order by duration desc;
+
+6. Find SAT scores of students whose high school names do not end with 'HS'.
+
+select * from sat_scores
+where school not like '%HS';
+
+7. How many accounts have performed a login in the year 2016?
+
+select count(distinct account_id) as no_accounts 
+from product_logins
+where year(login_date) = 2016
+group by year(login_date);
+
+8. Count the number of students lectured by each teacher.
+Output the result along with the name of the teacher.
+
+select teacher, count(distinct student_id) as no_of_students 
+from sat_scores
+group by teacher;
+
+9. How many users speak English, German, French or Spanish?
+Note: Users who speak more than one language are counted only once.
+
+select count(distinct user_id) 
+from playbook_users
+where language in ('english', 'german', 'french', 'spanish');
+
+10. Count the number of speakers for each language.
+Sort the result based on the number of speakers in descending order.
+
+select language, count(distinct user_id) as no_of_speakers
+from playbook_users
+group by language
+order by no_of_speakers desc;
+
+11. Find drafts which contains the word 'optimism'.
+
+select * 
+from google_file_store
+where filename like '%draft%' and contents like '%optimism%';
+
+12. Find all records with words that start with the letter 'g'.
+Output words1 and words2 if any of them satisfies the condition.
+
+select * from google_word_lists
+where words1 like 'g%' or words1 like '%,g%' or
+words2 like 'g%' or words2 like '%,g%';
+
+13. Find all companies with more than 10 employees. Output all columns.
+
+select * from google_adwords_earnings
+where n_employees > 10;
+
+14. Find business types present in the dataset.
+
+select distinct business_type from google_adwords_earnings;
+
+15. Find the number of employees in each department.
+Output the department name along with the corresponding number of employees.
+
+select department, count(distinct worker_id) as no_of_employees 
+from worker
+group by department;
+
+16. Find the last record of the dataset without using LIMIT or ORDER BY.
+Note: The earliest records correspond to the earliest employee ID's.
+
+select * from worker
+where worker_id = (select max(worker_id) from worker);
+
+17. Find the first record of the dataset without using LIMIT or ORDER BY.
+Note: The earliest records correspond to the earliest employee ID's.
+
+select * from worker
+where worker_id = (select min(worker_id) from worker);
+
+18. Find unique names women who participated in an Olympics before World War 2. Let's consider the year 1939 as the start of WW2.
+
+select distinct name 
+from olympics_athletes_events
+where year < 1939 and
+sex = 'F';
+
+19. Count the number of movies that Abigail Breslin was nominated for an oscar.
+
+select count(distinct movie) as no_of_movies
+from oscar_nominees
+where nominee = 'Abigail Breslin';
+
+20. Find the total AdWords earnings for each business type. Output the business types along with the total earnings.
+
+select business_type, sum(adwords_earnings) as total_adwords_earnings 
+from google_adwords_earnings
+group by business_type;
+
+21. Find doctors with the last name of 'Johnson' in the employee list. The output should contain both their first and last names.
+
+select first_name, last_name 
+from employee_list
+where profession = 'Doctor' and
+last_name = 'Johnson';
