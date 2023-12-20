@@ -1,0 +1,178 @@
+1. Find hotels in the Netherlands that got complaints from guests about room dirtiness (word "dirty" in its negative review). Output all the columns in your results
+
+select * from hotel_reviews
+where hotel_address like '%Netherlands%' and
+      negative_review like '%dirty%';
+
+2. Find the search details made by people who searched for apartments designed for a single-person stay.
+
+select * from airbnb_search_details
+where property_type like '%Apartment%' and
+      accommodates = 1;
+
+3. Find all searches for accommodations where the number of bedrooms is equal to the number of bathrooms.
+
+select * from airbnb_search_details
+where bathrooms = bedrooms;
+
+4. Find distinct searches for Los Angeles neighborhoods. Output neighborhoods and remove duplicates.
+
+select distinct neighbourhood from airbnb_search_details
+where city = 'LA';
+
+5. Find the search details for villas and houses with wireless internet access.
+
+select * from airbnb_search_details
+where (property_type = 'House' or 
+      property_type = 'Villa') and
+      amenities like '%Wireless Internet%';
+
+6. Find all search details where data is missing from the host_response_rate column.
+
+select * from airbnb_search_details
+where host_response_rate is null;
+
+7. Find all searches for San Francisco with a flexible cancellation policy and a review score rating. Sort the results by the review score in the descending order.
+
+select * from airbnb_search_details
+where city = 'SF' and
+      cancellation_policy = 'flexible' and
+      review_scores_rating is not null
+order by review_scores_rating desc;
+
+8. Find the average number of bathrooms and bedrooms for each city’s property types. Output the result along with the city name and the property type.
+
+select city, property_type, avg(bathrooms) as no_of_bathrooms, avg(bedrooms) as no_of_bedrooms
+from airbnb_search_details
+group by city, property_type;
+
+9. Find the price of the cheapest property for every city.
+
+select city, min(price) as cheapest_property 
+from airbnb_search_details
+group by city;
+
+10. Find all neighbourhoods present in this dataset.
+
+select distinct neighbourhood from airbnb_search_details;
+
+11. Find the average number of beds in each neighborhood that has at least 3 beds in total.
+Output results along with the neighborhood name and sort the results based on the number of average beds in descending order.
+
+select neighbourhood, avg(beds) as no_of_beds 
+from airbnb_search_details
+where neighbourhood is not null
+group by neighbourhood
+having sum(beds) >= 3
+order by no_of_beds desc;
+
+
+12. Find all neighborhoods that have properties with a parking space and don't charge for cleaning fees.
+
+select distinct neighbourhood 
+from airbnb_search_details
+where amenities like '%free parking on premises%' and
+      cleaning_fee = 0;
+
+13. Find the average number of searches made by each user and present the result with their corresponding user id.
+
+select id_user, avg(n_searches) as no_of_searches
+from airbnb_searches
+group by id_user;
+
+14. How many unique users have performed a search?
+
+select count(distinct id_user) from airbnb_searches;
+
+15. Find the number of people that made a search on Airbnb.
+
+select count(distinct id_user) from airbnb_searches;
+
+16. Find whether hosts or guests give higher review scores based on their average review scores. Output the higher of the average review score rounded to the 2nd decimal spot (e.g., 5.11).
+
+select from_type, avg(review_score) as avg_review_score
+from airbnb_reviews
+group by from_type
+order by avg_review_score desc
+limit 1;
+
+17. Find the total number of searches for houses in Westlake neighborhood with a TV among the amenities.
+
+select count(*) 
+from airbnb_search_details
+where neighbourhood = 'Westlake' and
+      amenities like '%TV%';
+
+18. Write a query to find which gender gives a higher average review score when writing reviews as guests. Use the from_type column to identify guest reviews. Output the gender and their average review score.
+
+select g.gender, avg(r.review_score) as avg_score
+from airbnb_guests g
+join airbnb_reviews r
+on r.from_user = g.guest_id
+where r.from_type = 'guest'
+group by g.gender
+order by avg_score desc
+limit 1;
+
+19. Rank guests based on their ages.
+Output the guest id along with the corresponding rank.
+Order records by the age in descending order.
+
+select guest_id, rank() over(order by age desc) as rnk
+from airbnb_guests
+order by rnk;
+
+20. Find the number of rows for each review score earned by 'Hotel Arena'. Output the hotel name (which should be 'Hotel Arena'), review score along with the corresponding number of rows with that score for the specified hotel.
+
+select hotel_name, reviewer_score, count(*) as no_of_rows 
+from hotel_reviews
+where hotel_name = 'Hotel Arena'
+group by reviewer_score;
+
+21. Find the total number of housing units completed for each year. Output the year along with the total number of housings. Order the result by year in ascending order.
+Note: Number of housing units in thousands.
+
+select year, sum(south) + sum(west) + sum(midwest) + sum(northeast) as total_units 
+from housing_units_completed_us
+group by year;
+
+22. Find the average number of days between the booking and check-in dates for AirBnB hosts. Order the results based on the average number of days in descending order.
+avg_days_between_booking_and_checkin DESC
+
+select id_host, avg(datediff(ds_checkin,ts_booking_at)) as avg_days_between_booking_and_checkin 
+from airbnb_contacts
+where ds_checkin is not null and
+      ts_booking_at is not null
+group by id_host
+order by avg_days_between_booking_and_checkin desc;
+
+23. Find the average accommodates-to-beds ratio for shared rooms in each city. Sort your results by listing cities with the highest ratios first.
+
+select city, avg(accommodates/beds) as accommodates_to_beds_ratio 
+from airbnb_search_details
+where room_type = 'Shared room'
+group by city
+order by accommodates_to_beds_ratio desc;
+
+24. To better understand the effect of the review count on the price of accomodation, categorize the number of reviews into the following groups along with the price.
+0 reviews: NO
+1 to 5 reviews: FEW
+6 to 15 reviews: SOME
+16 to 40 reviews: MANY
+more than 40 reviews: A LOT
+Output the price and it's categorization. Perform the categorization on accomodation level.
+
+select price, 
+       case when number_of_reviews = 0 then 'NO'
+            when number_of_reviews between 1 and 5 then 'FEW'
+            when number_of_reviews between 5 and 15 then 'SOME'
+            when number_of_reviews between 15 and 40 then 'MANY'
+            when number_of_reviews > 40 then 'A LOT' 
+       end as category 
+from airbnb_search_details;
+
+25. Find how many hosts are verified by the Airbnb staff and how many aren't. Assume that in each row you have a different host.
+
+select host_identity_verified, count(*) as no_of_hosts 
+from airbnb_search_details
+group by host_identity_verified;
