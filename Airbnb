@@ -176,3 +176,302 @@ from airbnb_search_details;
 select host_identity_verified, count(*) as no_of_hosts 
 from airbnb_search_details
 group by host_identity_verified;
+
+26. Find a neighborhood where you can sleep on a real bed in a villa with internet while paying the lowest price possible.
+
+with cte as 
+     (select neighbourhood, price 
+      from airbnb_search_details
+      where neighbourhood is not null and
+            bed_type = 'Real Bed' and
+            property_type = 'Villa' and
+            amenities like '%internet%')
+select cte.neighbourhood 
+from  cte
+where price = (select min(price) from cte)
+
+27. Find the total number of searches for each room type (apartments, private, shared) by city.
+
+select city,
+       sum(case when room_type = 'Entire home/apt' then 1
+                else 0
+                end) as no_of_apartments,
+       sum(case when room_type = 'Private room' then 1
+                else 0
+                end) as no_of_private,
+       sum(case when room_type = 'Shared room' then 1
+                else 0
+                end) as no_of_shared
+from airbnb_search_details
+group by city;
+
+28. Find the unique room types(filter room types column). Output each unique room types in its own row.
+
+select distinct substring_index(filter_room_types, ',', -1) as room_type
+from airbnb_searches;
+
+29. Find the number of nights that are searched by most people when trying to book a host.
+Output the number of nights alongside the total searches.
+Order records based on the total searches in descending order.
+
+select n_nights, sum(n_searches) as total_searches
+from airbnb_searches
+group by n_nights
+order by total_searches desc;
+
+30. Find the day of the week that most people want to check-in.
+Output the day of the week alongside the corresponding check-incount.
+
+select date_format(ds_checkin,'%w') as day_of_week, count(*) as no_of_checkins 
+from airbnb_contacts
+where ds_checkin is not null
+group by day_of_week
+order by no_of_checkins desc
+limit 1;
+
+31. Find the top ten hotels with the highest ratings.
+
+Output the hotel name along with the corresponding average score.
+Sort records based on the average score in descending order.
+
+with cte as
+(select hotel_name, avg(average_score) as rating, rank() over(order by avg(average_score) desc) as rnk 
+from hotel_reviews
+group by hotel_name)
+select hotel_name, rating
+from cte
+where  rnk <= 10;
+
+32. Find the 10 lowest rated hotels.
+Output the hotel name along with the corresponding average score.
+
+with cte as
+(select hotel_name, avg(average_score) as rating, 
+        rank() over(order by round(avg(average_score),1) asc) as rnk 
+from hotel_reviews
+group by hotel_name)
+select hotel_name, rating
+from cte
+where  rnk <= 10;
+
+33. Find the top two hotels with the most negative reviews.
+Output the hotel name along with the corresponding number of negative reviews. Negative reviews are all the reviews with text under negative review different than "No Negative"
+Sort records based on the number of negative reviews in descending order.
+
+select hotel_name, count(negative_review) as no_of_neg_reviews
+from hotel_reviews
+where negative_review is not null and
+      negative_review != 'No Negative'
+group by hotel_name
+order by no_of_neg_reviews desc
+limit 2;
+
+34. Find the countries whose citizens made the highest number of negative reviews. Output the country along with the number of negative reviews and sort records based on the number of negative reviews in descending order. Review is not negative if value negative value column equals to "No Negative". You can ignore countries with no negative reviews.
+
+select reviewer_nationality, count(negative_review) as no_of_neg_reviews
+from hotel_reviews
+where negative_review is not null and
+      negative_review <> 'No Negative'
+group by reviewer_nationality
+order by no_of_neg_reviews desc;
+
+35. Find the countries whose reviewers give most positive reviews. Positive reviews are all reviews where review text is different than "No Positive"
+Output all countries along with the number of positive reviews but sort records based on the number of positive reviews in descending order.
+Leave out the countries with no positive reviews.
+
+select reviewer_nationality, count(positive_review) as no_of_pos_reviews
+from hotel_reviews
+where positive_review is not null and
+      positive_review <> 'No Positive'
+group by reviewer_nationality
+order by no_of_pos_reviews desc;
+
+36. For each hotel find the number of reviews from the most active reviewer. The most active is the one with highest number of total reviews.
+Output the hotel name along with the highest total reviews of that reviewer. Output only top 5 hotels with highest total reviews.
+Order records based on the highest total reviews in descending order.
+
+with cte as
+(select hotel_name, max(total_number_of_reviews_reviewer_has_given) as most_reviews,
+       dense_rank() over(order by max(total_number_of_reviews_reviewer_has_given) desc) as rnk
+from hotel_reviews
+group by hotel_name)
+select hotel_name, most_reviews, rnk
+from cte
+where rnk <= 5;
+
+37. Find the number of hosts that have accommodations in countries of which they are not citizens.
+
+select count(distinct h.host_id) as no_of_hosts 
+from airbnb_hosts h
+join airbnb_apartments a
+on h.host_id = a.host_id
+where h.nationality <> a.country;
+
+38. For each guest reviewer, find the nationality of the reviewer’s favorite host based on the guest’s highest review score given to a host. Output the user ID of the guest along with their favorite host’s nationality. In case there is more than one favorite host from the same country, list that country only once (remove duplicates).
+Both the from_user and to_user columns are user IDs.
+
+with cte as
+(select r.from_user, r.to_user, r.review_score 
+from airbnb_reviews r
+inner join 
+(select from_user, max(review_score) as highest
+from airbnb_reviews
+where from_type = 'guest'
+group by from_user) m
+on r.from_user = m.from_user and
+   r.review_score = m.highest
+where r.from_type = 'guest')
+
+select distinct cte.from_user, h.nationality
+from cte
+inner join airbnb_hosts h
+on cte.to_user = h.host_id
+order by cte.from_user;
+
+39. Find the average age of guests reviewed by each host.
+Output the user along with the average age.
+
+select distinct r.from_user, avg(g.age) as avg_age 
+from airbnb_reviews r
+inner join airbnb_guests g
+on r.to_user = g.guest_id
+where from_type = 'host'
+group by r.from_user;
+
+40. Find matching hosts and guests pairs in a way that they are both of the same gender and nationality.
+Output the host id and the guest id of matched pair.
+
+select distinct h.host_id, g.guest_id 
+from airbnb_hosts h
+inner join airbnb_guests g
+on h.gender = g.gender and
+   h.nationality = g.nationality;
+
+41. Display the average number of times a user performed a search which led to a successful booking and the average number of times a user performed a search but did not lead to a booking. The output should have a column named action with values 'does not book' and 'books' as well as a 2nd column named average_searches with the average number of searches per action. Consider that the booking did not happen if the booking date is null. Be aware that search is connected to the booking only if their check-in dates match.
+
+with cte as 
+(select distinct id_guest, ds_checkin, ts_booking_at
+from airbnb_contacts
+where ts_booking_at is not null)
+
+select (case when ts_booking_at is not null and cte.ds_checkin = s.ds_checkin then 'books'
+            else 'does not book'
+            end) as output,
+        avg(s.n_searches) as avg_searches
+from cte
+right join airbnb_searches s
+on cte.id_guest = s.id_user
+group by output;
+
+42. Find the acceptance rate of requests which is defined as the ratio of accepted contacts vs all contacts. Multiply the ratio by 100 to get the rate.
+
+select sum(case when ts_accepted_at is not null then 1
+                else 0
+                end)*100/count(*) as acceptance_ratio
+from airbnb_contacts;
+
+43. Find the number of apartments per nationality that are owned by people under 30 years old.
+Output the nationality along with the number of apartments.
+Sort records by the apartments count in descending order.
+
+with cte as
+(select distinct * from airbnb_hosts
+where age < 30)
+
+select cte.nationality, count(distinct u.unit_id) as no_of_apartments 
+from cte 
+join airbnb_units u
+on cte.host_id = u.host_id
+where u.unit_type = 'Apartment'
+group by cte.nationality
+order by no_of_apartments desc
+
+44. Rank guests based on the number of messages they've exchanged with the hosts. Guests with the same number of messages as other guests should have the same rank. Do not skip rankings if the preceding rankings are identical.
+Output the rank, guest id, and number of total messages they've sent. Order by the highest number of total messages first.
+
+select id_guest, sum(n_messages) as total_messages,
+       dense_rank() over(order by sum(n_messages) desc) as rnk
+from airbnb_contacts
+group by id_guest;
+
+45. Rank each host based on the number of beds they have listed. The host with the most beds should be ranked 1 and the host with the least number of beds should be ranked last. Hosts that have the same number of beds should have the same rank but there should be no gaps between ranking values. A host can also own multiple properties.
+Output the host ID, number of beds, and rank from highest rank to lowest.
+
+select host_id, sum(n_beds) as total_beds,
+       dense_rank() over(order by sum(n_beds) desc) as rnk
+from airbnb_apartments
+group by host_id;
+
+46. Find the total number of available beds per hosts' nationality.
+Output the nationality along with the corresponding total number of available beds.
+Sort records by the total available beds in descending order.
+
+select h.nationality, sum(a.n_beds) as total_beds 
+from airbnb_apartments a
+join airbnb_hosts h
+on a.host_id = h.host_id
+group by h.nationality
+order by total_beds desc;
+
+47. You’re given a table of rental property searches by users. The table consists of search results and outputs host information for searchers. Find the minimum, average, maximum rental prices for each host’s popularity rating. The host’s popularity rating is defined as below:
+0 reviews: New
+1 to 5 reviews: Rising
+6 to 15 reviews: Trending Up
+16 to 40 reviews: Popular
+more than 40 reviews: Hot
+Tip: The id column in the table refers to the search ID. You'll need to create your own host_id by concating price, room_type, host_since, zipcode, and number_of_reviews.
+Output host popularity rating and their minimum, average and maximum rental prices.
+
+with cte as
+(select distinct concat(price,room_type,host_since,zipcode,number_of_reviews) as host_id, price,
+(case when number_of_reviews = 0 then 'New'
+      when number_of_reviews between 1 and 5 then 'Rising'
+      when number_of_reviews between 6 and 15 then 'Trending Up'
+      when number_of_reviews between 16 and 40 then 'Popular'
+      when number_of_reviews > 40 then 'Hot'
+      end) as popularity_rating
+from airbnb_host_searches)
+select popularity_rating, min(price) as minimum_price,
+        avg(price) as avg_price,
+        max(price) as maximum_price
+from cte
+group by popularity_rating;
+
+48. You're given a dataset of searches for properties on Airbnb. For simplicity, let's say that each search result (i.e., each row) represents a unique host. Find the city with the most amenities across all their host's properties. Output the name of the city.
+
+with cte as
+(select city, sum(length(amenities)) as total_amenities 
+from airbnb_search_details
+group by city)
+select city 
+from cte
+where total_amenities = (select max(total_amenities) from cte)
+;
+
+49. Find the average host response rate with a cleaning fee for each zipcode. Present the results as a percentage along with the zip code value.
+Convert the column 'host_response_rate' from TEXT to NUMERIC using type casts and string processing (take missing values as NULL).
+Order the result in ascending order based on the average host response rater after cleaning.
+
+select zipcode, coalesce(avg(cast(host_response_rate as float)),0) as response_rate 
+from airbnb_search_details
+where host_response_rate is not null 
+and cleaning_fee = 1
+group by zipcode
+order by response_rate;
+
+50. Estimate the growth of Airbnb each year using the number of hosts registered as the growth metric. The rate of growth is calculated by taking ((number of hosts registered in the current year - number of hosts registered in the previous year) / the number of hosts registered in the previous year) * 100.
+Output the year, number of hosts in the current year, number of hosts in the previous year, and the rate of growth. Round the rate of growth to the nearest percent and order the result in the ascending order based on the year.
+Assume that the dataset consists only of unique hosts, meaning there are no duplicate hosts listed.
+
+with cte as
+(select year(host_since) as year, count(id) as current_hosts 
+from airbnb_search_details
+group by year
+order by year)
+
+select cte.year, cte.current_hosts, cte2.current_hosts as previous_hosts,
+round(((cte.current_hosts - cte2.current_hosts)*100/cte2.current_hosts),0) as growth_rate
+from cte
+left join cte as cte2
+on cte.year = cte2.year + 1;
+
