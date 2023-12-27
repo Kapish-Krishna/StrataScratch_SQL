@@ -1,0 +1,86 @@
+1. Given a table of purchases by date, calculate the month-over-month percentage change in revenue. The output should include the year-month date (YYYY-MM) and percentage change, rounded to the 2nd decimal point, and sorted from the beginning of the year to the end of the year.
+The percentage change column will be populated from the 2nd month forward and can be calculated as ((this month's revenue - last month's revenue) / last month's revenue)*100.
+
+with cte as
+(select date_format(created_at, '%Y-%m') as month,
+        sum(value) as current_revenue,
+        lag(sum(value), 1) over() as previous_revenue
+from sf_transactions
+group by month
+order by month)
+
+select month, round(((current_revenue - previous_revenue)*100/previous_revenue),2) as pct_change
+from cte;
+
+2. Find the 3-month rolling average of total revenue from purchases given a table with users, their purchase amount, and date purchased. Do not include returns which are represented by negative purchase values. Output the year-month (YYYY-MM) and 3-month rolling average of revenue, sorted from earliest month to latest month.
+A 3-month rolling average is defined by calculating the average total revenue from all user purchases for the current month and previous two months. The first two months will not be a true 3-month rolling average since we are not given data from last year. Assume each month has at least one purchase.
+
+with cte as
+(select date_format(created_at, '%Y-%m') as month,
+       sum(purchase_amt) as revenue
+from amazon_purchases
+where purchase_amt > 0
+group by month
+order by month)
+
+select month, avg(revenue) over(order by month rows between 2 preceding and current row) as rolling_avg
+from cte;
+
+3. Find the best selling item for each month (no need to separate months by year) where the biggest total invoice was paid. The best selling item is calculated using the formula (unitprice * quantity). Output the month, the description of the item along with the amount paid.
+
+with cte as 
+(select date_format(invoicedate, '%m') as month,
+       description,
+       sum(unitprice*quantity) as total
+from online_retail
+group by month, stockcode
+order by month)
+
+select cte.month, cte.description, cte.total
+from cte
+join (select month, max(total) as amount_paid from cte group by month) m
+on cte.month = m.month and cte.total = m.amount_paid;
+
+4. Find products which are exclusive to only Amazon and therefore not sold at Top Shop and Macy's. Your output should include the product name, brand name, price, and rating.
+Two products are considered equal if they have the same product name and same maximum retail price (mrp column).
+
+select product_name, brand_name, price, rating
+from innerwear_amazon_com
+where (product_name, mrp) not in
+(select distinct product_name, mrp
+from (select product_name, mrp 
+        from innerwear_macys_com
+        union all
+        select product_name, mrp
+        from innerwear_topshop_com) mt);
+
+5. Given the users' sessions logs on a particular day, calculate how many hours each user was active that day.
+Note: The session starts when state=1 and ends when state=0.
+
+with cte as
+(select cust_id, state, timestamp,
+        lag(timestamp, 1) over(partition by cust_id order by timestamp) as logout_time
+from cust_tracking)
+
+select cust_id, sum(time_to_sec(timediff(timestamp, logout_time))/3600) as hours
+from cte
+where state = 0
+group by cust_id;
+
+6. Write a query to find the Market Share at the Product Brand level for each Territory, for Time Period Q4-2021. Market Share is the number of Products of a certain Product Brand brand sold in a territory, divided by the total number of Products sold in this Territory.
+Output the ID of the Territory, name of the Product Brand and the corresponding Market Share in percentages. Only include these Product Brands that had at least one sale in a given territory.
+
+with cte as
+(select s.order_id, s.prod_sku_id, s.order_value, t.territory_id, p.prod_brand 
+from fct_customer_sales s
+join map_customer_territory t
+on s.cust_id = t.cust_id
+join dim_product p
+on s.prod_sku_id = p.prod_sku_id
+where (date_format(s.order_date, '%Y-%m') between '2021-10' and '2021-12')
+and order_id is not null)
+
+select distinct territory_id, prod_brand,
+        (count(prod_sku_id) over(partition by territory_id, prod_brand)*100/
+        count(prod_sku_id) over(partition by territory_id)) as market_share
+from cte;
