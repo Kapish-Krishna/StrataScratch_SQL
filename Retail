@@ -1,0 +1,121 @@
+1. Find the number of unique transactions and total sales for each of the product categories in 2017. Output the product categories, number of transactions, and total sales in descending order. The sales column represents the total cost the customer paid for the product so no additional calculations need to be done on the column.
+Only include product categories that have products sold.
+
+select p.product_category, count(distinct t.transaction_id) as no_of_transactions,
+       sum(t.sales) as total_sales 
+from wfm_transactions t
+join wfm_products p
+on t.product_id = p.product_id
+where year(t.transaction_date) = 2017
+group by product_category
+order by total_sales desc;
+
+2. You have been asked to find the three lowest distinct salaries. For example, if two people earn the same amount of money, they are counted as one.
+
+select distinct salary 
+from worker
+order by salary
+limit 3;
+
+3. Find employees whose bonus is less than $150.
+Output the first name along with the corresponding bonus.
+
+select first_name, bonus 
+from employee
+where bonus < 150;
+
+4. Find employees that are not referred by the manager id 1.
+Output the first name of the employee.
+
+select first_name 
+from employee
+where manager_id <> 1;
+
+5. Summarize the number of customers and transactions for each month in 2017, keeping transactions that were greater or equal to $5.
+
+with cte as
+(select customer_id, transaction_date, transaction_id, sum(sales) as total_sales
+from wfm_transactions
+where year(transaction_date) = 2017
+group by transaction_id)
+
+select month(transaction_date) as month,
+       count(distinct customer_id) as no_of_customers,
+       count(distinct transaction_id) as no_of_transactions
+from cte
+where total_sales >= 5
+group by month;
+
+6. Write a query to get the list of managers whose salary is less than twice the average salary of employees reporting to them. For these managers, output their ID, salary and the average salary of employees reporting to them.
+
+with cte as
+(select m.manager_empl_id, avg(e.salary) as avg_empl_salary 
+from map_employee_hierarchy m
+join dim_employee e
+on m.empl_id = e.empl_id
+where manager_empl_id is not null
+group by m.manager_empl_id)
+
+select cte.manager_empl_id, d.salary, cte.avg_empl_salary
+from cte
+join dim_employee d
+on cte.manager_empl_id = d.empl_id
+where d.salary < 2*cte.avg_empl_salary;
+
+7. Find employees who are earning more than their managers. Output the employee's first name along with the corresponding salary.
+
+select e.first_name, e.salary 
+from employee e
+join employee m
+on e.manager_id = m.id
+where e.salary > m.salary;
+
+8. Find managers with at least 7 direct reporting employees. In situations where user is reporting to himself/herself, count that also.
+Output first names of managers.
+
+with cte as 
+(select manager_id, count(distinct id) as no_of_empls 
+from employee
+group by manager_id
+having no_of_empls >= 7)
+
+select e.first_name
+from employee e
+join cte
+on e.id = cte.manager_id;
+
+9. Find the employee who has achieved the highest target.
+Output the employee's first name along with the achieved target and the bonus.
+
+select first_name, target, bonus 
+from employee
+where target = (select max(target) from employee);
+
+10. WFM would like to segment the customers in each of their store brands into Low, Medium, and High segmentation. The segments are to be based on a customer's average basket size which is defined as (total sales / count of transactions), per customer.
+The segment thresholds are as follows:
+If average basket size is more than $30, then Segment is “High”.
+If average basket size is between $20 and $30, then Segment is “Medium”.
+If average basket size is less than $20, then Segment is “Low”.
+Summarize the number of unique customers, the total number of transactions, total sales, and average basket size, grouped by store brand and segment for 2017.
+Your output should include the brand, segment, number of customers, total transactions, total sales, and average basket size.
+
+with cte as
+(select t.customer_id, s.store_brand, count(distinct t.transaction_id) as no_of_transactions,
+       sum(t.sales) as total_sales,
+       (case when sum(t.sales)/count(distinct t.transaction_id) > 30 then 'High'
+             when sum(t.sales)/count(distinct t.transaction_id) between 20 and 30 then 'Medium'
+             when sum(t.sales)/count(distinct t.transaction_id) < 20 then 'Low'
+             end) as segment
+from wfm_transactions t
+join wfm_stores s
+on t.store_id = s.store_id
+where year(t.transaction_date) = 2017
+group by t.customer_id, s.store_brand)
+
+select store_brand, segment, count(customer_id) as no_of_customers,
+       sum(no_of_transactions) as total_transactions,
+       sum(total_sales) as store_total_sales,
+       sum(total_sales)/sum(no_of_transactions) as avg_basket_size
+from cte
+group by store_brand, segment
+order by store_brand;
