@@ -84,3 +84,217 @@ select distinct territory_id, prod_brand,
         (count(prod_sku_id) over(partition by territory_id, prod_brand)*100/
         count(prod_sku_id) over(partition by territory_id)) as market_share
 from cte;
+
+7. Write a query to return Territory and corresponding Sales Growth. Compare growth between periods Q4-2021 vs Q3-2021.
+If Territory (say T123) has Sales worth $100 in Q3-2021 and Sales worth $110 in Q4-2021, then the Sales Growth will be 10% [ i.e. = ((110 - 100)/100) * 100 ]
+Output the ID of the Territory and the Sales Growth. Only output these territories that had any sales in both quarters.
+
+with cte1 as 
+(select t.territory_id, sum(s.order_value) as Q3_sales 
+from fct_customer_sales s
+join map_customer_territory t
+on s.cust_id = t.cust_id
+where date_format(order_date, '%Y-%m') between '2021-07' and '2021-09'
+and s.order_id is not null
+group by t.territory_id),
+
+cte2 as
+(select t.territory_id, sum(s.order_value) as Q4_sales 
+from fct_customer_sales s
+join map_customer_territory t
+on s.cust_id = t.cust_id
+where date_format(order_date, '%Y-%m') between '2021-10' and '2021-12'
+and s.order_id is not null
+group by t.territory_id)
+
+select cte1.territory_id, ((cte2.Q4_sales - cte1.Q3_sales)*100/cte1.Q3_sales) as sales_growth
+from cte1
+join cte2
+on cte1.territory_id = cte2.territory_id;
+
+8. Calculate the first-day retention rate of a group of video game players. The first-day retention occurs when a player logs in 1 day after their first-ever log-in.
+Return the proportion of players who meet this definition divided by the total number of players.
+
+with cte as
+(select player_id, login_date,
+        row_number() over (partition by player_id order by login_date) as login_times
+from players_logins),
+
+cte2 as
+(select player_id, login_date,
+        lag(login_date, 1) over (partition by player_id) as 1st_login
+from cte
+where login_times between 1 and 2)
+
+select (sum(case when datediff(login_date, 1st_login) <= 1 then 1
+                 else 0
+                 end)/count(distinct player_id)) as retention_rate
+from cte2
+
+9. You are given the table with titles of recipes from a cookbook and their page numbers. You are asked to represent how the recipes will be distributed in the book.
+Produce a table consisting of three columns: left_page_number, left_title and right_title. The k-th row (counting from 0), should contain the number and the title of the page with the number 2×k in the first and second columns respectively, and the title of the page with the number 2×k+1 in the third column.
+Each page contains at most 1 recipe. If the page does not contain a recipe, the appropriate cell should remain empty (NULL value). Page 0 (the internal side of the front cover) is guaranteed to be empty.
+
+with cte as
+(select *, (row_number() over (order by page_number) - 1) as pg_no
+from cookbook_titles)
+
+select ((row_number() over (order by cte.pg_no) - 1)*2) as left_page_number, 
+        cte2.title as left_title,
+        cte3.title as right_title
+from cte
+left join cte as cte2
+on cte.pg_no*2 = cte2.page_number
+left join cte as cte3
+on (cte.pg_no*2 + 1) = cte3.page_number;
+
+10. The column 'perc_viewed' in the table 'post_views' denotes the percentage of the session duration time the user spent viewing a post. Using it, calculate the total time that each post was viewed by users. Output post ID and the total viewing time in seconds, but only for posts with a total viewing time of over 5 seconds.
+
+select p.post_id, 
+    sum(time_to_sec(timediff(u.session_endtime, u.session_starttime))*p.perc_viewed/100) as post_viewed_time
+from user_sessions u
+join post_views p
+on u.session_id = p.session_id
+group by p.post_id
+having post_viewed_time > 5;
+
+11. You have a table of in-app purchases by user. Users that make their first in-app purchase are placed in a marketing campaign where they see call-to-actions for more in-app purchases. Find the number of users that made additional in-app purchases due to the success of the marketing campaign.
+The marketing campaign doesn't start until one day after the initial in-app purchase so users that only made one or multiple purchases on the first day do not count, nor do we count users that over time purchase only the products they purchased on the first day.
+
+with
+cte as (
+    select user_id
+    from marketing_campaign
+    group by user_id
+    having count(distinct created_at) > 1 and count(distinct product_id) > 1
+),
+
+-- cte2 as (
+--     select *, rank() over (partition by user_id order by created_at) as rnk
+--     from marketing_campaign
+-- ),
+
+-- cte3 as (
+--     select concat(user_id, '_', product_id) as user_and_product_id
+--     from cte2
+--     where rnk = 1
+-- )
+
+-- select count(distinct user_id)
+-- from marketing_campaign
+-- where
+--     user_id in (select user_id from cte) and
+--     concat(user_id, '_', product_id) not in (select user_and_product_id from cte3);
+    
+cte2 as (
+    select *, rank() over (partition by user_id order by created_at) as rnk
+    from marketing_campaign
+),
+
+cte3 as (
+    select user_id, product_id
+    from cte2
+    where rnk = 1
+    group by user_id, product_id
+),
+
+cte4 as (
+    select user_id, product_id
+    from marketing_campaign
+    except
+    select user_id, product_id
+    from cte3
+)
+
+select count(distinct user_id)
+from cte4
+where user_id in (select user_id from cte)
+
+12. Given a list of a company's employees, find the name of the manager from the largest department. Manager is each employee that contains word "manager" under their position.  Output their first and last name.
+
+with 
+cte as (
+    select department_id, count(*) as no_of_employees
+    from az_employees
+    group by department_id
+)
+
+select first_name, last_name
+from az_employees
+where department_id in (
+    select department_id 
+    from (
+        select department_id, no_of_employees
+        from cte
+        where no_of_employees = (
+            select max(no_of_employees)
+            from cte
+            ) 
+        ) cte2
+    ) 
+and position like '%manager%';
+
+13. List the IDs of customers who made at least 3 orders in both 2020 and 2021.
+
+with cte as (
+    select user_id,
+            count(*) as no_of_orders_2020
+    from amazon_orders
+    where year(order_date) = 2020
+    group by user_id
+    order by user_id
+),
+
+cte2 as (
+    select user_id,
+            count(*) as no_of_orders_2021
+    from amazon_orders
+    where year(order_date) = 2021
+    group by user_id
+    order by user_id
+)
+
+select cte.user_id
+from cte
+join cte2
+on cte.user_id = cte2.user_id
+where cte.no_of_orders_2020 >= 3
+and cte2.no_of_orders_2021 >= 3
+
+14. Each Employee is assigned one territory and is responsible for the Customers from this territory. There may be multiple employees assigned to the same territory.
+Write a query to get the Employees who are responsible for the maximum number of Customers. Output the Employee ID and the number of Customers.
+
+with cte as (
+    select territory_id, count(*) as no_of_cust
+    from map_customer_territory
+    group by territory_id
+),
+
+cte2 as (
+    select et.empl_id, sum(no_of_cust) as total_cust#et.territory_id, cte.no_of_cust
+    from map_employee_territory et
+    join cte
+    on et.territory_id = cte.territory_id
+    group by et.empl_id
+)
+
+select empl_id, total_cust
+from cte2
+where total_cust = (select max(total_cust) from cte2);
+
+15. What is the last name of the employee or employees who are responsible for the most orders?
+
+with cte as (
+    select resp_employee_id,
+            count(distinct order_id) as no_of_orders
+    from shopify_orders
+    group by resp_employee_id
+)
+
+select last_name
+from shopify_employees
+where id in (
+    select resp_employee_id 
+    from cte
+    where no_of_orders = (select max(no_of_orders) from cte)
+);
